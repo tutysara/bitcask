@@ -39,10 +39,11 @@ package net.tutysara.db;
 import net.tutysara.db.datatype.U32;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
-record EncoderResponse(int size, byte[] data){}
-record DecoderResponse(long timestamp, String key, String value){}
+
 
 
 public class Format {
@@ -66,65 +67,73 @@ public class Format {
 // These three fields store unsigned integers of size 4 bytes, giving our header a
 // fixed length of 12 bytes. Timestamp field stores the time the record we
 // inserted in unix epoch seconds. Key size and value size fields store the length of
-// bytes occupied by the key and value. The maximum integer
-// stored by 4 bytes is 4,294,967,295 (2 ** 32 - 1), roughly ~4.2GB. So, the size of
+// bytes occupied by the key and value. The maximum signed integer (Java's Integer.MAX_VALUE)
+// stored by 4 bytes is 2,147,483,647 (2 ** 31 - 1), roughly ~2.1GB. So, the size of
 // each key or value cannot exceed this. Theoretically, a single row can be as large
-// as ~8.4GB.
-private static int headerSize = 12;
+// as ~4.2GB.
+public static int HEADER_SIZE = 12;
+public static Charset CHAR_SET = StandardCharsets.UTF_8;
 
 // KeyEntry keeps the metadata about the KV, specially the position of
 // the byte offset in the file. Whenever we insert/update a key, we create a new
 // KeyEntry object and insert that into keyDir.
 
-    record KeyEntry(U32 timestamp, U32 position, U32 totalSize){}
+    record KeyEntry(long timestamp, long position, int totalSize){}
 
-    record Header(U32 timeStamp, U32 keySize, U32 valueSize){}
+    record Header(U32 timeStamp, int keySize, int valueSize){}
 
-    private byte[] encodeHeader(Header header){
-        ByteBuffer buffer = ByteBuffer.allocate(headerSize);
+    record DecoderResponse(long timestamp, String key, String value){
+        public int size(){
+            return Format.HEADER_SIZE +
+                    key.getBytes(Format.CHAR_SET).length +
+                    value.getBytes(Format.CHAR_SET).length;
+        }
+    }
+
+    static byte[] encodeHeader(Header header){
+        ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE);
         buffer.put(header.timeStamp.bytes());
-        buffer.put(header.keySize.bytes());
-        buffer.put(header.valueSize.bytes());
+        buffer.putInt(header.keySize);
+        buffer.putInt(header.valueSize);
         return buffer.array();
     }
 
-    private Header decodeHeader(byte[] bytes){
-        assert bytes.length == headerSize : "header size should be equal to " + headerSize;
+    static Header decodeHeader(byte[] bytes){
+        assert bytes.length == HEADER_SIZE : "header size should be equal to " + HEADER_SIZE;
         ByteBuffer buffer = ByteBuffer.wrap(bytes);
         byte[] dest = new byte[4];
         buffer.get(dest);
         U32 timeStamp = U32.fromBytes(dest);
-        buffer.get(dest);
-        U32 keySize = U32.fromBytes(dest);
-        buffer.get(dest);
-        U32 valueSize = U32.fromBytes(dest);
+        int keySize = buffer.getInt();
+        int valueSize = buffer.getInt();
         return new Header(timeStamp, keySize, valueSize);
     }
 
-    public EncoderResponse encodeKV(long timestamp, String key, String value){
-        Header header = new Header(U32.fromLong(timestamp),
-                U32.fromLong((long) key.length()),
-                U32.fromLong((long) value.length()));
+    public static byte[] encodeKV(long timestamp, String key, String value){
+
+        int keySize = key.getBytes(CHAR_SET).length;
+        int valueSize = value.getBytes(CHAR_SET).length;
+
+        Header header = new Header(U32.fromLong(timestamp), keySize, valueSize);
         byte[] headerBytes = encodeHeader(header);
 
-        var length = headerSize + key.length() + value.length();
-       ByteBuffer buffer = ByteBuffer.allocate(length);
+       ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + keySize + valueSize);
        buffer.put(headerBytes);
-       buffer.put(key.getBytes());
-       buffer.put(value.getBytes());
-       return new EncoderResponse(length, buffer.array());
+       buffer.put(key.getBytes(CHAR_SET));
+       buffer.put(value.getBytes(CHAR_SET));
+       return buffer.array();
 
     }
 
-    public DecoderResponse decodeKV(byte[] data){
-        Header header = decodeHeader(Arrays.copyOfRange(data, 0, headerSize));
+    public static DecoderResponse decodeKV(byte[] data){
+        Header header = decodeHeader(Arrays.copyOfRange(data, 0, HEADER_SIZE));
 
-        // this supports only ints and not uints or longs
-        String key = new String(Arrays.copyOfRange(data,
-                    headerSize,
-                headerSize+ header.keySize.val()));
+        String key = new String(
+                        Arrays.copyOfRange(data,
+                                HEADER_SIZE,
+                                        HEADER_SIZE + header.keySize));
         String val = new String(Arrays.copyOfRange(data,
-                headerSize+header.keySize.val(),
+                HEADER_SIZE +header.keySize,
                 data.length));
         return new DecoderResponse(header.timeStamp.toLong(), key, val);
     }
