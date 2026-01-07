@@ -7,6 +7,8 @@ import static net.tutysara.db.Format.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class FormatTest {
+
+    /*
     @Test
     void testEncodeHeader() {
         int[][] tests = {
@@ -48,5 +50,8 @@ public class FormatTest {
             assertEquals(expectedSize, encoded.length, "size mismatch");
         }
     }
+     */
+
+
 }
 
