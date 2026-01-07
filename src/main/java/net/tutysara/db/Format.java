@@ -44,8 +44,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 
-
-
 public class Format {
 
     // headerSize specifies the total header size. Our key value pair, when stored on disk
@@ -71,26 +69,14 @@ public class Format {
 // stored by 4 bytes is 2,147,483,647 (2 ** 31 - 1), roughly ~2.1GB. So, the size of
 // each key or value cannot exceed this. Theoretically, a single row can be as large
 // as ~4.2GB.
-public static int HEADER_SIZE = 12;
-public static Charset CHAR_SET = StandardCharsets.UTF_8;
+    public static int HEADER_SIZE = 12;
+    public static Charset CHAR_SET = StandardCharsets.UTF_8;
 
 // KeyEntry keeps the metadata about the KV, specially the position of
 // the byte offset in the file. Whenever we insert/update a key, we create a new
 // KeyEntry object and insert that into keyDir.
 
-    record KeyEntry(long timestamp, long position, int totalSize){}
-
-    record Header(U32 timeStamp, int keySize, int valueSize){}
-
-    record DecoderResponse(long timestamp, String key, String value){
-        public int size(){
-            return Format.HEADER_SIZE +
-                    key.getBytes(Format.CHAR_SET).length +
-                    value.getBytes(Format.CHAR_SET).length;
-        }
-    }
-
-    static byte[] encodeHeader(Header header){
+    static byte[] encodeHeader(Header header) {
         ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE);
         buffer.put(header.timeStamp.bytes());
         buffer.putInt(header.keySize);
@@ -98,7 +84,7 @@ public static Charset CHAR_SET = StandardCharsets.UTF_8;
         return buffer.array();
     }
 
-    static Header decodeHeader(byte[] bytes){
+    static Header decodeHeader(byte[] bytes) {
         assert bytes.length == HEADER_SIZE : "header size should be equal to " + HEADER_SIZE;
         ByteBuffer buffer = ByteBuffer.wrap(bytes);
         byte[] dest = new byte[4];
@@ -109,7 +95,7 @@ public static Charset CHAR_SET = StandardCharsets.UTF_8;
         return new Header(timeStamp, keySize, valueSize);
     }
 
-    public static byte[] encodeKV(long timestamp, String key, String value){
+    public static byte[] encodeKV(long timestamp, String key, String value) {
 
         int keySize = key.getBytes(CHAR_SET).length;
         int valueSize = value.getBytes(CHAR_SET).length;
@@ -117,24 +103,38 @@ public static Charset CHAR_SET = StandardCharsets.UTF_8;
         Header header = new Header(U32.fromLong(timestamp), keySize, valueSize);
         byte[] headerBytes = encodeHeader(header);
 
-       ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + keySize + valueSize);
-       buffer.put(headerBytes);
-       buffer.put(key.getBytes(CHAR_SET));
-       buffer.put(value.getBytes(CHAR_SET));
-       return buffer.array();
+        ByteBuffer buffer = ByteBuffer.allocate(HEADER_SIZE + keySize + valueSize);
+        buffer.put(headerBytes);
+        buffer.put(key.getBytes(CHAR_SET));
+        buffer.put(value.getBytes(CHAR_SET));
+        return buffer.array();
 
     }
 
-    public static DecoderResponse decodeKV(byte[] data){
+    public static DecoderResponse decodeKV(byte[] data) {
         Header header = decodeHeader(Arrays.copyOfRange(data, 0, HEADER_SIZE));
 
         String key = new String(
-                        Arrays.copyOfRange(data,
-                                HEADER_SIZE,
-                                        HEADER_SIZE + header.keySize));
+                Arrays.copyOfRange(data,
+                        HEADER_SIZE,
+                        HEADER_SIZE + header.keySize));
         String val = new String(Arrays.copyOfRange(data,
-                HEADER_SIZE +header.keySize,
+                HEADER_SIZE + header.keySize,
                 data.length));
         return new DecoderResponse(header.timeStamp.toLong(), key, val);
+    }
+
+    record KeyEntry(long timestamp, long position, int totalSize) {
+    }
+
+    record Header(U32 timeStamp, int keySize, int valueSize) {
+    }
+
+    record DecoderResponse(long timestamp, String key, String value) {
+        public int size() {
+            return Format.HEADER_SIZE +
+                    key.getBytes(Format.CHAR_SET).length +
+                    value.getBytes(Format.CHAR_SET).length;
+        }
     }
 }
