@@ -98,7 +98,7 @@ public class DiskStore implements Store, AutoCloseable{
 
         log.info("Loading file data...");
         int recordCount = 0;
-        while(filechannel.position() < filechannel.size()){
+        while(true){
             ByteBuffer buffer = ByteBuffer.allocate(Format.HEADER_SIZE);
             long position = filechannel.position();
             int bytesRead = filechannel.read(buffer);
@@ -113,14 +113,14 @@ public class DiskStore implements Store, AutoCloseable{
             bytesRead = filechannel.read(bufferKey);
             assert bytesRead == header.keySize() : "Mismatch between bytesRead and header.keySize";
             bufferKey.flip();
-            String key = new String(bufferKey.array());
+            String key = new String(bufferKey.array(), Format.CHAR_SET);
             bufferKey.clear();
 
             ByteBuffer bufferValue = ByteBuffer.allocate(header.valueSize());
             bytesRead = filechannel.read(bufferValue);
             assert bytesRead == header.valueSize() : "Mismatch between bytesRead and header.valueSize";
             bufferValue.flip();
-            String value = new String(bufferValue.array());
+            String value = new String(bufferValue.array(), Format.CHAR_SET);
             bufferValue.clear();
 
             int totalSize = Format.HEADER_SIZE +  header.keySize() + header.valueSize();
