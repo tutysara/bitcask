@@ -31,8 +31,8 @@ public class FormatTest {
     @Test
     void test_EncodeKV() {
         Object[][] tests = {
-               // {10, "hello", "world", HEADER_SIZE + 10},
-               // {0, "", "", HEADER_SIZE},
+                {10, "hello", "world", HEADER_SIZE + 10},
+                {0, "", "", HEADER_SIZE},
                 {100, "🔑", "", HEADER_SIZE + "🔑".getBytes(StandardCharsets.UTF_8).length}
         };
 

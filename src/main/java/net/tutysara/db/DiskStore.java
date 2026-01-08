@@ -1,5 +1,8 @@
 package net.tutysara.db;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -8,8 +11,10 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
+;
 
-public class DiskStore implements Store{
+public class DiskStore implements Store, AutoCloseable{
+    private static final Logger log = LoggerFactory.getLogger(DiskStore.class);
     private FileChannel filechannel;
     private Map<String, Format.KeyEntry> keyDir =  new HashMap<>();
 
@@ -31,7 +36,7 @@ public class DiskStore implements Store{
         }
     }
 
-    public void close() throws IOException {
+    public void close() throws Exception {
         if(filechannel != null){
             filechannel.close();
         }
@@ -91,7 +96,8 @@ public class DiskStore implements Store{
         // NOTE: this method is a blocking one, if the DB size is huge then it will take
         // a lot of time to startup
 
-        System.out.println("Loading file data...");
+        log.info("Loading file data...");
+        int recordCount = 0;
         while(filechannel.position() < filechannel.size()){
             ByteBuffer buffer = ByteBuffer.allocate(Format.HEADER_SIZE);
             long position = filechannel.position();
@@ -119,9 +125,10 @@ public class DiskStore implements Store{
 
             int totalSize = Format.HEADER_SIZE +  header.keySize() + header.valueSize();
             keyDir.put(key, new Format.KeyEntry(header.timeStamp().toLong(), position, totalSize));
-            System.out.printf("loaded key=%s, value=%s\n", key, value);
+            recordCount++;
+            log.info("loaded key={}, value={}", key, value);
 
         }
-        System.out.println("Loaded " + keyDir.size() + " keys");
+        log.info("Scanned {} entries, Loaded {} unique keys", recordCount,keyDir.size());
     }
 }
